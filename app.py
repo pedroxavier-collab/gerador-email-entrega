@@ -128,6 +128,7 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
     passos    = dados.get("proximos_passos") or []
 
     # ---- Bloco de detalhes técnicos (só com campos preenchidos) -------
+    # Layout responsivo: rótulo em cima, valor embaixo em telas pequenas
     linhas = []
     if protocolo: linhas.append(("Protocolo / processo", protocolo))
     if validade:  linhas.append(("Validade", validade))
@@ -136,20 +137,21 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
 
     bloco_detalhes = ""
     if linhas:
+        # Largura proporcional (40/60) com word-wrap pra evitar overflow em mobile
         linhas_html = "".join(
             f"<tr>"
-            f"<td style='padding:6px 14px 6px 0;color:{COR_CINZA};font-size:13px;'>{rotulo}</td>"
-            f"<td style='padding:6px 0;font-size:13px;font-weight:600;color:{COR_PRETO};'>{valor}</td>"
+            f"<td width='40%' style='padding:7px 14px 7px 0;color:{COR_CINZA};font-size:13px;vertical-align:top;word-wrap:break-word;'>{rotulo}</td>"
+            f"<td width='60%' style='padding:7px 0;font-size:13px;font-weight:600;color:{COR_PRETO};vertical-align:top;word-wrap:break-word;'>{valor}</td>"
             f"</tr>"
             for rotulo, valor in linhas
         )
         bloco_detalhes = (
-            f"<table cellpadding='0' cellspacing='0' border='0' width='100%' "
-            f"style='border-collapse:collapse;margin:20px 0;'>"
+            f"<table role='presentation' cellpadding='0' cellspacing='0' border='0' width='100%' "
+            f"style='border-collapse:collapse;margin:20px 0;width:100%;'>"
             f"<tr><td style='background:{COR_FUNDO_CLARO};border-left:4px solid {COR_LARANJA};padding:14px 18px;'>"
             f"<p style='font-size:11px;color:{COR_LARANJA};margin:0 0 10px;text-transform:uppercase;"
             f"letter-spacing:1.2px;font-weight:700;font-family:Arial,sans-serif;'>Detalhes do documento</p>"
-            f"<table cellpadding='0' cellspacing='0' border='0' style='width:100%;border-collapse:collapse;'>"
+            f"<table role='presentation' cellpadding='0' cellspacing='0' border='0' width='100%' style='width:100%;border-collapse:collapse;table-layout:fixed;'>"
             f"{linhas_html}</table>"
             f"</td></tr></table>"
         )
@@ -158,15 +160,15 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
     bloco_passos = ""
     if passos:
         itens = "".join(
-            f"<tr><td valign='top' style='padding:5px 10px 5px 0;color:{COR_LARANJA};"
-            f"font-size:14px;font-weight:700;width:18px;'>▸</td>"
-            f"<td style='padding:5px 0;font-size:14px;color:{COR_PRETO};'>{p}</td></tr>"
+            f"<tr><td valign='top' width='20' style='padding:5px 10px 5px 0;color:{COR_LARANJA};"
+            f"font-size:14px;font-weight:700;'>▸</td>"
+            f"<td style='padding:5px 0;font-size:14px;color:{COR_PRETO};word-wrap:break-word;'>{p}</td></tr>"
             for p in passos
         )
         bloco_passos = (
             f"<p style='margin:24px 0 8px;font-weight:700;color:{COR_PRETO};font-size:14px;'>"
             f"Próximos passos</p>"
-            f"<table cellpadding='0' cellspacing='0' border='0' style='border-collapse:collapse;'>"
+            f"<table role='presentation' cellpadding='0' cellspacing='0' border='0' width='100%' style='border-collapse:collapse;width:100%;'>"
             f"{itens}</table>"
         )
 
@@ -174,29 +176,47 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
     bloco_anexos = ""
     if nomes_anexos:
         itens_anexos = "".join(
-            f"<tr><td valign='top' style='padding:4px 8px 4px 0;color:{COR_CINZA};"
-            f"font-size:13px;width:18px;'>📎</td>"
-            f"<td style='padding:4px 0;font-size:13px;color:{COR_PRETO};'>{nome}</td></tr>"
+            f"<tr><td valign='top' width='20' style='padding:4px 8px 4px 0;color:{COR_CINZA};"
+            f"font-size:13px;'>📎</td>"
+            f"<td style='padding:4px 0;font-size:13px;color:{COR_PRETO};word-break:break-all;'>{nome}</td></tr>"
             for nome in nomes_anexos
         )
         bloco_anexos = (
             f"<p style='margin:24px 0 8px;font-weight:700;color:{COR_PRETO};font-size:14px;'>"
             f"Arquivos em anexo</p>"
-            f"<table cellpadding='0' cellspacing='0' border='0' style='border-collapse:collapse;'>"
+            f"<table role='presentation' cellpadding='0' cellspacing='0' border='0' width='100%' style='border-collapse:collapse;width:100%;'>"
             f"{itens_anexos}</table>"
         )
 
-    # ---- Estrutura completa (header preto + corpo + rodapé) -----------
+    # ---- Estrutura completa (FLUID LAYOUT — responsivo) ---------------
+    # Técnicas usadas pra ficar responsivo:
+    # • Tabela externa width="100%" com max-width:620px no style → ocupa tela
+    #   inteira em mobile, limita em 620px no desktop
+    # • Padding menor (24px em vez de 32px) → bom em ambos os tamanhos
+    # • Logo com max-width:100% e height:auto → encolhe se a tela for menor
+    # • word-wrap nos textos longos → não estoura layout em telas estreitas
+    # • <style> com @media query → bônus pros clientes que suportam (Gmail,
+    #   Apple Mail, Outlook Web). Outlook Desktop ignora mas o fluid layout
+    #   já cobre o caso dele.
     html = f"""
-<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:{COR_BRANCO};font-family:Arial,Helvetica,sans-serif;">
+<style>
+@media only screen and (max-width: 600px) {{
+  .ep-corpo {{ padding: 20px !important; }}
+  .ep-header {{ padding: 20px !important; }}
+  .ep-rodape {{ padding: 14px 20px !important; }}
+  .ep-logo {{ width: 140px !important; height: auto !important; }}
+  .ep-titulo-bloco {{ font-size: 10px !important; }}
+}}
+</style>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;background:{COR_BRANCO};font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;">
 <tr>
   <td align="center" style="padding:0;">
-    <table cellpadding="0" cellspacing="0" border="0" width="620" style="border-collapse:collapse;max-width:620px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;max-width:620px;margin:0 auto;">
 
       <!-- HEADER: faixa preta com logo Expanzio -->
       <tr>
-        <td style="background:{COR_PRETO};padding:24px 32px;">
-          <img src="data:image/png;base64,{LOGO_BASE64}" alt="Expanzio" width="180" height="55" style="display:block;border:0;outline:none;text-decoration:none;" />
+        <td class="ep-header" style="background:{COR_PRETO};padding:24px 28px;">
+          <img class="ep-logo" src="data:image/png;base64,{LOGO_BASE64}" alt="Expanzio" width="180" style="display:block;border:0;outline:none;text-decoration:none;max-width:100%;height:auto;" />
         </td>
       </tr>
 
@@ -205,7 +225,7 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
 
       <!-- CORPO DO EMAIL -->
       <tr>
-        <td style="padding:32px;background:{COR_BRANCO};color:{COR_PRETO};font-size:14px;line-height:1.65;">
+        <td class="ep-corpo" style="padding:28px;background:{COR_BRANCO};color:{COR_PRETO};font-size:14px;line-height:1.65;">
 
           <p style="margin:0 0 16px;color:{COR_PRETO};">
             Olá, equipe da <strong>{cliente}</strong>,
@@ -226,7 +246,7 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
           </p>
 
           <!-- Assinatura -->
-          <table cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;border-top:1px solid #e5e5e5;width:100%;border-collapse:collapse;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px;border-top:1px solid #e5e5e5;width:100%;border-collapse:collapse;">
             <tr><td style="padding-top:16px;">
               <p style="margin:0;font-size:14px;color:{COR_PRETO};font-weight:700;">{remetente}</p>
               <p style="margin:4px 0 0;font-size:12px;color:{COR_CINZA};">Expanzio</p>
@@ -238,9 +258,9 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
 
       <!-- RODAPÉ: faixa preta -->
       <tr>
-        <td style="background:{COR_PRETO};padding:16px 32px;text-align:center;">
+        <td class="ep-rodape" style="background:{COR_PRETO};padding:16px 28px;text-align:center;">
           <p style="margin:0;color:{COR_CINZA};font-size:11px;letter-spacing:0.5px;">
-            EXPANZIO &nbsp;·&nbsp; este email contém informações da entrega oficial do documento
+            EXPANZIO &nbsp;·&nbsp; entrega oficial de documento
           </p>
         </td>
       </tr>
@@ -376,12 +396,23 @@ st.set_page_config(
 
 aplicar_css_expanzio()
 
-# Cabeçalho com a marca
+# Helper: decodifica o logo do base64 pra usar em st.image
+def obter_logo_bytes():
+    """Decodifica o logo embutido em base64 pra um objeto que o Streamlit consegue exibir."""
+    import base64
+    from io import BytesIO
+    return BytesIO(base64.b64decode(LOGO_BASE64))
+
+
+# Cabeçalho com a marca (logo + título)
+col_logo, _ = st.columns([1, 2])
+with col_logo:
+    st.image(obter_logo_bytes(), width=180)
+
 st.markdown(
     f"""
     <div class="titulo-expanzio">
-        <p style="color:{COR_LARANJA};font-size:12px;font-weight:700;letter-spacing:3px;margin:0;">EXPANZIO</p>
-        <h1 style="margin:4px 0 0;font-size:28px;">📧 Gerador de Email de Entrega</h1>
+        <h1 style="margin:8px 0 0;font-size:26px;">Gerador de Email de Entrega</h1>
     </div>
     <p style="color:{COR_CINZA};font-size:14px;margin:8px 0 24px;">
         Envie o documento da entrega e copie o email pronto pro cliente.
@@ -394,9 +425,11 @@ api_key = carregar_api_key()
 
 # ---- Barra lateral ------------------------------------------------------
 with st.sidebar:
+    # Logo no topo da sidebar
+    st.image(obter_logo_bytes(), width=140)
+
     st.markdown(
-        f"<p style='color:{COR_LARANJA};font-size:11px;font-weight:700;letter-spacing:2px;margin:0;'>EXPANZIO</p>"
-        f"<h3 style='margin:4px 0 16px;color:{COR_BRANCO};'>Configurações</h3>",
+        f"<h3 style='margin:12px 0 16px;color:{COR_BRANCO};font-size:16px;'>Configurações</h3>",
         unsafe_allow_html=True,
     )
 
