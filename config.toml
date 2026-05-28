@@ -1,0 +1,10 @@
+# Tema visual do Streamlit — Identidade Expanzio
+# Aplica as cores da marca na interface do app
+
+[theme]
+base = "dark"
+primaryColor = "#FB4710"
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#1a1a1a"
+textColor = "#FFFFFF"
+font = "sans serif"
