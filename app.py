@@ -489,11 +489,14 @@ if arquivos and api_key:
     assunto = dados.get("assunto_email") or ""
 
     st.caption("📨 Pré-visualização — assim que vai chegar pro cliente:")
-    st.markdown(
-        f"<div style='border:1px solid #333;border-radius:8px;padding:0;"
-        f"background:white;margin:8px 0 16px;overflow:hidden;'>{html_email}</div>",
-        unsafe_allow_html=True,
+    # Renderiza dentro de um iframe (components.html) porque st.markdown não
+    # consegue lidar com imagens base64 longas — embrulha tudo num container
+    # branco com bordas pra ficar visualmente igual ao email final.
+    preview_html = (
+        f"<div style='border:1px solid #ddd;border-radius:8px;padding:0;"
+        f"background:white;overflow:hidden;'>{html_email}</div>"
     )
+    components.html(preview_html, height=900, scrolling=True)
 
     botao_copiar(html_email, assunto)
 
