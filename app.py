@@ -489,6 +489,18 @@ if arquivos and api_key:
                 dados = extrair_dados_documento(pdfs[0], api_key)
                 st.session_state.dados_extraidos = dados
                 st.session_state.ultimo_pdf = nome_pdf_atual
+                # Inicializa cada campo no session_state com o valor extraído.
+                # Como cada widget vai usar `key=`, o session_state vira a
+                # fonte única da verdade — qualquer edição atualiza ele direto.
+                st.session_state.f_cliente   = dados.get("cliente") or ""
+                st.session_state.f_validade  = dados.get("validade") or ""
+                st.session_state.f_orgao     = dados.get("orgao_emissor") or ""
+                st.session_state.f_tipo      = dados.get("tipo_entrega") or ""
+                st.session_state.f_protocolo = dados.get("numero_protocolo") or ""
+                st.session_state.f_endereco  = dados.get("endereco_obra") or ""
+                st.session_state.f_assunto   = dados.get("assunto_email") or ""
+                st.session_state.f_resumo    = dados.get("resumo_entrega") or ""
+                st.session_state.f_passos    = "\n".join(dados.get("proximos_passos") or [])
             except json.JSONDecodeError:
                 st.error("A IA retornou um formato inesperado. Tente de novo.")
                 st.stop()
@@ -496,30 +508,53 @@ if arquivos and api_key:
                 st.error(f"Erro ao processar: {e}")
                 st.stop()
 
-    dados = st.session_state.dados_extraidos
-
+    # Renderiza os campos usando `key=` — o Streamlit gerencia o valor
+    # diretamente no session_state. Sem `value=` aqui (causaria reset).
     col1, col2 = st.columns(2)
     with col1:
-        dados["cliente"] = st.text_input("Cliente", value=dados.get("cliente") or "")
-        dados["validade"] = st.text_input("Validade", value=dados.get("validade") or "", placeholder="DD/MM/AAAA")
-        dados["orgao_emissor"] = st.text_input("Órgão emissor", value=dados.get("orgao_emissor") or "")
+        st.text_input("Cliente", key="f_cliente")
+        st.text_input("Validade", key="f_validade", placeholder="DD/MM/AAAA")
+        st.text_input("Órgão emissor", key="f_orgao")
     with col2:
-        dados["tipo_entrega"] = st.text_input("Tipo de entrega", value=dados.get("tipo_entrega") or "")
-        dados["numero_protocolo"] = st.text_input("Nº protocolo / processo", value=dados.get("numero_protocolo") or "")
-        dados["endereco_obra"] = st.text_input("Endereço (se aplicável)", value=dados.get("endereco_obra") or "")
+        st.text_input("Tipo de entrega", key="f_tipo")
+        st.text_input("Nº protocolo / processo", key="f_protocolo")
+        st.text_input("Endereço (se aplicável)", key="f_endereco")
 
-    dados["assunto_email"] = st.text_input("Assunto do email", value=dados.get("assunto_email") or "")
-    dados["resumo_entrega"] = st.text_area("Resumo da entrega (1 frase)", value=dados.get("resumo_entrega") or "", height=70)
+    st.text_input("Assunto do email", key="f_assunto")
+    st.text_area("Resumo da entrega (1 frase)", height=70, key="f_resumo")
+    st.text_area("Próximos passos (um por linha)", height=90, key="f_passos")
 
-    passos_texto = "\n".join(dados.get("proximos_passos") or [])
-    passos_editados = st.text_area("Próximos passos (um por linha)", value=passos_texto, height=90)
-    dados["proximos_passos"] = [p.strip() for p in passos_editados.split("\n") if p.strip()]
+    # Monta o dicionário de dados SEMPRE a partir do session_state.
+    # Toda vez que o Streamlit re-roda (em qualquer edição de campo),
+    # esse dict é reconstruído com os valores mais novos.
+    dados_atual = {
+        "cliente":          st.session_state.f_cliente,
+        "validade":         st.session_state.f_validade,
+        "orgao_emissor":    st.session_state.f_orgao,
+        "tipo_entrega":     st.session_state.f_tipo,
+        "numero_protocolo": st.session_state.f_protocolo,
+        "endereco_obra":    st.session_state.f_endereco,
+        "assunto_email":    st.session_state.f_assunto,
+        "resumo_entrega":   st.session_state.f_resumo,
+        "proximos_passos":  [p.strip() for p in st.session_state.f_passos.split("\n") if p.strip()],
+    }
 
     # ---- Passo 3: Preview + botões --------------------------------------
     st.markdown(f"<h3 style='color:{COR_LARANJA};font-size:14px;letter-spacing:1.5px;margin:32px 0 8px;'>3 · EMAIL PRONTO PRA ENVIAR</h3>", unsafe_allow_html=True)
 
-    html_email = montar_email_html(dados, nomes_anexos, remetente)
-    assunto = dados.get("assunto_email") or ""
+    html_email = montar_email_html(dados_atual, nomes_anexos, remetente)
+    assunto = dados_atual.get("assunto_email") or ""
+
+    # Mostra o assunto como linha de "label" antes do preview (assim o usuário
+    # vê que ele também é atualizado quando edita o campo correspondente)
+    st.markdown(
+        f"<div style='background:#1a1a1a;border-left:3px solid {COR_LARANJA};"
+        f"padding:10px 14px;margin:8px 0;border-radius:4px;'>"
+        f"<span style='color:{COR_CINZA};font-size:11px;text-transform:uppercase;letter-spacing:1px;'>Assunto</span><br>"
+        f"<span style='color:{COR_BRANCO};font-size:14px;font-weight:600;'>{html_lib.escape(assunto) or '(sem assunto)'}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
     st.caption("📨 Pré-visualização — assim que vai chegar pro cliente:")
     # Renderiza dentro de um iframe (components.html) porque st.markdown não
