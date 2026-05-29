@@ -53,43 +53,124 @@ def carregar_api_key() -> str:
 
 
 # =========================================================================
-# EXTRAÇÃO DE DADOS DO PDF COM GEMINI
+# TONS DE MENSAGEM — BIBLIOTECA OFICIAL DA EXPANZIO
 # =========================================================================
-def extrair_dados_documento(arquivo_pdf, api_key: str) -> dict:
+# Textos de referência extraídos do documento "Mensagens para entregáveis".
+# A IA usa o texto correspondente como inspiração de estilo ao gerar a
+# mensagem do email — adapta os termos aos dados reais do documento.
+TONS_MENSAGEM = {
+    "Celebratório (padrão)": """Passando para compartilhar uma ótima notícia: o [DOCUMENTO] da sua unidade em [LOCALIZAÇÃO] foi oficialmente aprovado pelo [ÓRGÃO]! 🎉
+
+Sim, agora é oficial: o que começou como um desafio está totalmente destravado. ✅
+
+Foram exigências técnicas, ajustes normativos, idas e vindas com órgãos públicos — e agora você tem em mãos o documento que garante a segurança legal que sua operação precisava para seguir expandindo com confiança.
+
+Parabéns por chegar até aqui. Essa vitória é sua. A Expanzio só teve o privilégio de eliminar as barreiras que estavam no seu caminho.
+
+Conte com a gente para o que precisar.
+
+Juntos, somos exponenciais.""",
+
+    "Inspiracional": """Temos uma vitória para celebrar!
+
+O [DOCUMENTO] foi aprovado pelo [ÓRGÃO]. O seu projeto em [LOCALIZAÇÃO] está oficialmente liberado para [próxima etapa].
+
+Sabemos o quanto esse processo exigiu atenção técnica, precisão e persistência — tanto da nossa equipe quanto da sua. Foram desafios técnicos, interpretações normativas complexas e todo o jogo de cintura que a burocracia exige.
+
+Mas chegamos lá. ✅
+
+Agora você pode seguir com a tranquilidade de quem tem tudo regulado e gerar impacto com segurança.
+
+Esse resultado é fruto da sua perseverança — nós apenas transformamos os obstáculos burocráticos em ponte. Porque enquanto outros são paralisados por problemas, nós somos movidos por eles. Ver você seguindo em frente é nosso maior combustível. 🧡
+
+Estamos à disposição!""",
+
+    "Técnico e profissional": """Aprovação confirmada: [DOCUMENTO] emitido pelo [ÓRGÃO] para seu projeto em [LOCALIZAÇÃO].
+
+O que isso significa na prática? Benefício específico conquistado e próximo passo liberado com total segurança jurídica.
+
+Durante o processo, superamos desafios técnicos, alinhamos interpretações normativas com o órgão responsável e garantimos que cada exigência fosse atendida com precisão técnica.
+
+Cada órgão público tem sua própria lógica. Vencer esse processo exige estratégia, persistência e conhecimento. Foi o que fizemos juntos.
+
+Agora, o seu caminho está livre.
+
+Essa conquista é sua. A Expanzio apenas aplicou a expertise necessária para que as barreiras regulatórias não limitassem seus objetivos.""",
+
+    "Institucional e acolhedor": """O [DOCUMENTO] da sua unidade foi emitido junto ao [ÓRGÃO] e já está disponível para você. ✅
+
+Essa entrega representa o encerramento de mais uma etapa regulatória — superada com análise técnica, controle de prazos e adequação aos critérios do órgão responsável.
+
+Sabemos que não foi simples: foram exigências específicas, documentação técnica complexa e toda aquela dança que a regularização exige. Mas valeu cada esforço.
+
+Agora você pode seguir sua operação sem preocupação, com a certeza de que está tudo certo junto ao órgão responsável.
+
+Seguimos com o compromisso de transformar processos complexos em entregas seguras, com agilidade e responsabilidade.
+
+Nosso papel é ser seu braço direito nessa jornada! Conte conosco.""",
+
+    "Conciso e direto": """Missão cumprida.
+
+Depois de exigências técnicas, revisões, protocolos e muito trabalho nos bastidores, chegou a hora de celebrar: o [DOCUMENTO] da sua unidade foi aprovado.
+
+O [ÓRGÃO] liberou oficialmente seu projeto em [LOCALIZAÇÃO].
+
+Cada etapa desse processo tinha um só objetivo: garantir que você pudesse seguir sua operação com segurança, legalidade e liberdade.
+
+Esse resultado é seu. A Expanzio esteve aqui para garantir que tudo acontecesse do jeito certo.
+
+Agora é seguir conquistando. E sempre que uma nova barreira burocrática aparecer, você já sabe: juntos, somos exponenciais.""",
+}
+
+
+# =========================================================================
+# EXTRAÇÃO DE DADOS DO PDF COM GEMINI (incluindo a mensagem no tom escolhido)
+# =========================================================================
+def extrair_dados_documento(arquivo_pdf, api_key: str, tom_escolhido: str) -> dict:
     """
-    Envia o PDF pro Gemini e pede pra ele extrair as informações
-    necessárias pra montar o email, retornando um JSON estruturado.
+    Envia o PDF pro Gemini e pede pra ele extrair as informações estruturadas
+    + escrever a mensagem do email no TOM ESCOLHIDO, usando como referência
+    o exemplo correspondente da biblioteca oficial da Expanzio.
     """
     genai.configure(api_key=api_key)
     modelo = genai.GenerativeModel(MODEL_NAME)
 
-    prompt = """
-Você é um assistente da Expanzio, que lê documentos brasileiros de
-licenciamento e projetos técnicos (alvarás, licenças, AVCB, projetos
-aprovados de arquitetura, incêndio, publicidade, etc.) e extrai
-informações pra preparar um email formal de entrega ao cliente.
+    exemplo_tom = TONS_MENSAGEM.get(tom_escolhido, TONS_MENSAGEM["Celebratório (padrão)"])
 
-Leia o documento anexo e retorne APENAS um JSON válido (sem texto
-adicional, sem markdown, sem ```json), com essa estrutura:
+    prompt = f"""
+Você é redator(a) oficial da EXPANZIO, empresa que cuida de licenciamento e
+regularização de projetos no Brasil (alvarás, AVCB, projetos de incêndio,
+publicidade, arquitetura, etc.). Sua tarefa é ler o documento PDF anexo e
+gerar um email de entrega ao cliente.
 
-{
+REFERÊNCIA DE TOM E ESTILO — use o texto abaixo como INSPIRAÇÃO de voz da
+marca. Adapte aos dados reais do documento. Mantenha emojis se o exemplo
+usar, mantenha a frase de assinatura da marca se ela aparecer ("Juntos,
+somos exponenciais"), e o ritmo / vocabulário desse exemplo:
+
+\"\"\"
+{exemplo_tom}
+\"\"\"
+
+---
+
+Agora, leia o PDF anexo e retorne APENAS um JSON válido (sem markdown, sem
+```json, sem texto fora do JSON), com essa estrutura:
+
+{{
   "cliente": "nome do cliente ou empresa destinatária",
-  "tipo_entrega": "tipo do documento (ex.: 'Alvará de Funcionamento', 'Projeto Executivo de Incêndio', 'Licença Publicitária')",
+  "tipo_entrega": "tipo do documento (ex.: 'Alvará de Funcionamento')",
   "numero_protocolo": "número de protocolo/processo/registro (ou null)",
   "validade": "data de validade no formato DD/MM/AAAA (ou null)",
-  "orgao_emissor": "órgão emissor (ex.: Prefeitura de São Paulo, Corpo de Bombeiros) ou null",
+  "orgao_emissor": "órgão que emitiu (ex.: 'Prefeitura de São Paulo') ou null",
   "endereco_obra": "endereço do imóvel/obra mencionado (ou null)",
-  "resumo_entrega": "1 frase curta dizendo o que está sendo entregue",
-  "proximos_passos": ["até 3 ações", "que o cliente deve tomar", "depois de receber"],
-  "assunto_email": "assunto sugerido pro email, no formato: 'Expanzio | Entrega: [Tipo] - [Cliente]'"
-}
+  "mensagem_principal": "TEXTO MULTI-PARÁGRAFO do email no tom de referência acima. IMPORTANTE: parágrafos separados por DUAS quebras de linha (\\n\\n). NÃO inclua saudação inicial ('Olá, X') nem assinatura final — só o miolo da mensagem. Use emojis com moderação se o exemplo usa. Adapte ao documento real (preencha onde tem [DOCUMENTO], [ÓRGÃO], [LOCALIZAÇÃO]). Substitua frases genéricas por informações específicas extraídas do PDF.",
+  "proximos_passos": ["até 3 ações", "que o cliente deve tomar"],
+  "assunto_email": "assunto seguindo o padrão Expanzio (ex.: '[Documento] aprovado pelo [órgão] — projeto em [localização] regularizado')"
+}}
 
-Para campos não encontrados, use null. Para 'proximos_passos', sugira
-ações típicas pro tipo de documento (ex.: alvará → manter cópia visível
-e renovar com antecedência; projeto de incêndio → contratar manutenção
-periódica dos equipamentos).
-
-Retorne APENAS o JSON, nada mais.
+Para campos não encontrados, use null (ou string vazia em listas). Retorne
+APENAS o JSON.
 """
 
     arquivo_pdf.seek(0)
@@ -124,8 +205,15 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
     validade  = dados.get("validade")
     orgao     = dados.get("orgao_emissor")
     endereco  = dados.get("endereco_obra")
-    resumo    = dados.get("resumo_entrega") or f"Segue em anexo o {tipo}."
+    # Mensagem principal: texto multi-parágrafo no tom escolhido
+    mensagem  = dados.get("mensagem_principal") or f"Segue em anexo o {tipo}."
     passos    = dados.get("proximos_passos") or []
+
+    # Converte a mensagem (parágrafos separados por \n\n) em <p> HTML
+    paragrafos_html = "".join(
+        f"<p style='margin:0 0 14px;color:{COR_PRETO};'>{p.strip()}</p>"
+        for p in mensagem.split("\n\n") if p.strip()
+    )
 
     # ---- Bloco de detalhes técnicos (só com campos preenchidos) -------
     # Layout responsivo: rótulo em cima, valor embaixo em telas pequenas
@@ -228,12 +316,10 @@ def montar_email_html(dados: dict, nomes_anexos: list, remetente: str) -> str:
         <td class="ep-corpo" style="padding:28px;background:{COR_BRANCO};color:{COR_PRETO};font-size:14px;line-height:1.65;">
 
           <p style="margin:0 0 16px;color:{COR_PRETO};">
-            Olá, equipe da <strong>{cliente}</strong>,
+            Olá, <strong>{cliente}</strong>,
           </p>
 
-          <p style="margin:0 0 16px;color:{COR_PRETO};">
-            {resumo}
-          </p>
+          {paragrafos_html}
 
           {bloco_detalhes}
 
@@ -473,22 +559,45 @@ if arquivos and api_key:
         st.error("⚠️ Envie pelo menos 1 PDF — a IA precisa dele pra extrair os dados.")
         st.stop()
 
+    # ---- Passo 1.5: Tom da mensagem -------------------------------------
+    st.markdown(f"<h3 style='color:{COR_LARANJA};font-size:14px;letter-spacing:1.5px;margin:32px 0 8px;'>2 · ESCOLHA O TOM DA MENSAGEM</h3>", unsafe_allow_html=True)
+    st.caption("A IA vai gerar o texto do email seguindo o tom escolhido (biblioteca oficial Expanzio).")
+    tom_escolhido = st.selectbox(
+        "Tom",
+        options=list(TONS_MENSAGEM.keys()),
+        index=0,
+        label_visibility="collapsed",
+        help="Cada opção corresponde a um dos textos de referência da Expanzio.",
+    )
+
+    # Preview pequeno do tom escolhido (pra o usuário entender o que vai sair)
+    with st.expander(f"👀 Ver exemplo do tom *{tom_escolhido}*"):
+        st.markdown(
+            f"<div style='background:#1a1a1a;padding:14px 18px;border-radius:6px;"
+            f"border-left:3px solid {COR_LARANJA};color:#ddd;font-size:13px;"
+            f"line-height:1.6;white-space:pre-wrap;'>{TONS_MENSAGEM[tom_escolhido]}</div>",
+            unsafe_allow_html=True,
+        )
+
     # ---- Passo 2: Extração com cache na sessão --------------------------
-    st.markdown(f"<h3 style='color:{COR_LARANJA};font-size:14px;letter-spacing:1.5px;margin:32px 0 8px;'>2 · CONFIRA OS DADOS EXTRAÍDOS</h3>", unsafe_allow_html=True)
-    st.caption("Ajuste qualquer campo que esteja errado antes de gerar o email.")
+    st.markdown(f"<h3 style='color:{COR_LARANJA};font-size:14px;letter-spacing:1.5px;margin:32px 0 8px;'>3 · CONFIRA OS DADOS E A MENSAGEM</h3>", unsafe_allow_html=True)
+    st.caption("Ajuste qualquer campo que esteja errado. Editar aqui não chama a IA de novo — só editar o tom acima refaz.")
 
     nome_pdf_atual = pdfs[0].name
+    # Cache considera PDF + tom: muda qualquer um dos dois → re-chama a IA
     cache_valido = (
         "dados_extraidos" in st.session_state
         and st.session_state.get("ultimo_pdf") == nome_pdf_atual
+        and st.session_state.get("ultimo_tom") == tom_escolhido
     )
 
     if not cache_valido:
-        with st.spinner("Lendo o documento com a IA..."):
+        with st.spinner(f"Lendo o documento e escrevendo a mensagem no tom *{tom_escolhido}*..."):
             try:
-                dados = extrair_dados_documento(pdfs[0], api_key)
+                dados = extrair_dados_documento(pdfs[0], api_key, tom_escolhido)
                 st.session_state.dados_extraidos = dados
                 st.session_state.ultimo_pdf = nome_pdf_atual
+                st.session_state.ultimo_tom = tom_escolhido
                 # Inicializa cada campo no session_state com o valor extraído.
                 # Como cada widget vai usar `key=`, o session_state vira a
                 # fonte única da verdade — qualquer edição atualiza ele direto.
@@ -499,7 +608,7 @@ if arquivos and api_key:
                 st.session_state.f_protocolo = dados.get("numero_protocolo") or ""
                 st.session_state.f_endereco  = dados.get("endereco_obra") or ""
                 st.session_state.f_assunto   = dados.get("assunto_email") or ""
-                st.session_state.f_resumo    = dados.get("resumo_entrega") or ""
+                st.session_state.f_mensagem  = dados.get("mensagem_principal") or ""
                 st.session_state.f_passos    = "\n".join(dados.get("proximos_passos") or [])
             except json.JSONDecodeError:
                 st.error("A IA retornou um formato inesperado. Tente de novo.")
@@ -521,26 +630,33 @@ if arquivos and api_key:
         st.text_input("Endereço (se aplicável)", key="f_endereco")
 
     st.text_input("Assunto do email", key="f_assunto")
-    st.text_area("Resumo da entrega (1 frase)", height=70, key="f_resumo")
+    # Mensagem do email — texto multi-parágrafo gerado pela IA no tom escolhido.
+    # Altura maior porque agora são vários parágrafos. Usuário pode editar à vontade.
+    st.text_area(
+        "Mensagem do email (parágrafos separados por linha em branco)",
+        height=280,
+        key="f_mensagem",
+        help="Editar aqui muda só o texto do email, sem chamar a IA. Se quiser refazer no zero, mude o tom acima.",
+    )
     st.text_area("Próximos passos (um por linha)", height=90, key="f_passos")
 
     # Monta o dicionário de dados SEMPRE a partir do session_state.
     # Toda vez que o Streamlit re-roda (em qualquer edição de campo),
     # esse dict é reconstruído com os valores mais novos.
     dados_atual = {
-        "cliente":          st.session_state.f_cliente,
-        "validade":         st.session_state.f_validade,
-        "orgao_emissor":    st.session_state.f_orgao,
-        "tipo_entrega":     st.session_state.f_tipo,
-        "numero_protocolo": st.session_state.f_protocolo,
-        "endereco_obra":    st.session_state.f_endereco,
-        "assunto_email":    st.session_state.f_assunto,
-        "resumo_entrega":   st.session_state.f_resumo,
-        "proximos_passos":  [p.strip() for p in st.session_state.f_passos.split("\n") if p.strip()],
+        "cliente":             st.session_state.f_cliente,
+        "validade":            st.session_state.f_validade,
+        "orgao_emissor":       st.session_state.f_orgao,
+        "tipo_entrega":        st.session_state.f_tipo,
+        "numero_protocolo":    st.session_state.f_protocolo,
+        "endereco_obra":       st.session_state.f_endereco,
+        "assunto_email":       st.session_state.f_assunto,
+        "mensagem_principal":  st.session_state.f_mensagem,
+        "proximos_passos":     [p.strip() for p in st.session_state.f_passos.split("\n") if p.strip()],
     }
 
-    # ---- Passo 3: Preview + botões --------------------------------------
-    st.markdown(f"<h3 style='color:{COR_LARANJA};font-size:14px;letter-spacing:1.5px;margin:32px 0 8px;'>3 · EMAIL PRONTO PRA ENVIAR</h3>", unsafe_allow_html=True)
+    # ---- Passo 4: Preview + botões --------------------------------------
+    st.markdown(f"<h3 style='color:{COR_LARANJA};font-size:14px;letter-spacing:1.5px;margin:32px 0 8px;'>4 · EMAIL PRONTO PRA ENVIAR</h3>", unsafe_allow_html=True)
 
     html_email = montar_email_html(dados_atual, nomes_anexos, remetente)
     assunto = dados_atual.get("assunto_email") or ""
